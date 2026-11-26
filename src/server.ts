@@ -129,15 +129,14 @@ export function createServer(
 ) {
   const app = express();
   app.set('trust proxy', 1);
+  app.use(express.json());
 
-  // Webhook Telegram: dipasang sebelum parser json global jika perlu, atau gunakan webhookCallback grammY
+  // Webhook Telegram: dipasang setelah express.json() agar req.body ter-parse dengan benar
   if (webhookSecret) {
     app.use('/api/telegram/webhook', webhookCallback(bot, 'express', { secretToken: webhookSecret }));
   } else {
     app.use('/api/telegram/webhook', webhookCallback(bot, 'express'));
   }
-
-  app.use(express.json());
 
   const vncProxy = createProxyMiddleware({
     target: 'http://127.0.0.1:6080',
