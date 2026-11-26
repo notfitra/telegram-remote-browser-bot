@@ -9,6 +9,10 @@ export interface SystemStats {
   memUsedMB: number;
   memFreeMB: number;
   memUsagePercent: number;
+  diskTotalGB: number;
+  diskUsedGB: number;
+  diskFreeGB: number;
+  diskUsagePercent: number;
   processRssMB: number;
   uptimeSeconds: number;
   activeBrowserSessions: number;
@@ -74,6 +78,40 @@ function readCgroupMemoryUsageBytes(): number | null {
   return null;
 }
 
+function readDiskStats(mountPath = '/'): {
+  diskTotalGB: number;
+  diskUsedGB: number;
+  diskFreeGB: number;
+  diskUsagePercent: number;
+} {
+  try {
+    const s = fs.statfsSync(mountPath);
+    const totalBytes = Number(s.blocks) * Number(s.bsize);
+    const freeBytes = Number(s.bavail) * Number(s.bsize);
+    const usedBytes = Math.max(0, totalBytes - freeBytes);
+
+    const toGB = (b: number) => Number((b / (1024 * 1024 * 1024)).toFixed(1));
+    const totalGB = toGB(totalBytes);
+    const usedGB = toGB(usedBytes);
+    const freeGB = toGB(freeBytes);
+    const percent = totalBytes > 0 ? Number(((usedBytes / totalBytes) * 100).toFixed(1)) : 0;
+
+    return {
+      diskTotalGB: totalGB,
+      diskUsedGB: usedGB,
+      diskFreeGB: freeGB,
+      diskUsagePercent: percent,
+    };
+  } catch {
+    return {
+      diskTotalGB: 0,
+      diskUsedGB: 0,
+      diskFreeGB: 0,
+      diskUsagePercent: 0,
+    };
+  }
+}
+
 export async function getSystemStats(activeBrowserSessions: number): Promise<SystemStats> {
   const start = readCpuTimes();
   await new Promise((r) => setTimeout(r, 250));
@@ -92,6 +130,7 @@ export async function getSystemStats(activeBrowserSessions: number): Promise<Sys
       : totalBytes - os.freemem();
   const freeBytes = Math.max(0, totalBytes - usedBytes);
 
+  const disk = readDiskStats('/');
   const toMB = (b: number) => Math.round(b / (1024 * 1024));
 
   return {
@@ -102,6 +141,10 @@ export async function getSystemStats(activeBrowserSessions: number): Promise<Sys
     memUsedMB: toMB(usedBytes),
     memFreeMB: toMB(freeBytes),
     memUsagePercent: Number(((usedBytes / totalBytes) * 100).toFixed(1)),
+    diskTotalGB: disk.diskTotalGB,
+    diskUsedGB: disk.diskUsedGB,
+    diskFreeGB: disk.diskFreeGB,
+    diskUsagePercent: disk.diskUsagePercent,
     processRssMB: toMB(process.memoryUsage().rss),
     uptimeSeconds: Math.floor(process.uptime()),
     activeBrowserSessions,

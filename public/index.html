@@ -444,6 +444,18 @@
         <div id="sys-cpu-sub" class="card-sub">-</div>
       </div>
 
+      <div class="bento-card">
+        <div class="card-label">Storage Server</div>
+        <div id="sys-disk" class="card-value">-</div>
+        <div id="sys-disk-sub" class="card-sub">-</div>
+      </div>
+
+      <div class="bento-card">
+        <div class="card-label">Sesi Aktif</div>
+        <div id="sys-session" class="card-value">-</div>
+        <div id="sys-session-sub" class="card-sub">-</div>
+      </div>
+
       <div class="bento-card span-2">
         <div class="card-label">Twitch Drops Background Watch</div>
         <div class="card-sub">
@@ -637,7 +649,17 @@
             `${data.system.memUsedMB} / ${data.system.memTotalMB} MB`;
           document.getElementById('sys-cpu').textContent = `${data.system.cpuUsagePercent}%`;
           document.getElementById('sys-cpu-sub').textContent =
-            `${data.system.cpuCores} core • ${data.system.activeBrowserSessions} sesi`;
+            `${data.system.cpuCores} core • load ${data.system.loadAvg1m}`;
+          if (document.getElementById('sys-disk')) {
+            document.getElementById('sys-disk').textContent = `${data.system.diskUsagePercent}%`;
+            document.getElementById('sys-disk-sub').textContent =
+              `${data.system.diskUsedGB} / ${data.system.diskTotalGB} GB (Sisa ${data.system.diskFreeGB} GB)`;
+          }
+          if (document.getElementById('sys-session')) {
+            document.getElementById('sys-session').textContent = `${data.system.activeBrowserSessions} sesi`;
+            const m = Math.floor(data.system.uptimeSeconds / 60);
+            document.getElementById('sys-session-sub').textContent = `Uptime bot: ${m}m`;
+          }
         }
 
         renderBookmarks(data.bookmarks || []);

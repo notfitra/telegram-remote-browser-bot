@@ -163,6 +163,8 @@ export function createBot(
       `• CPU: <b>${stats.cpuUsagePercent}%</b> (${stats.cpuCores} core, load 1m: ${stats.loadAvg1m})`,
       `• RAM Terpakai: <b>${stats.memUsedMB} MB / ${stats.memTotalMB} MB</b> (${stats.memUsagePercent}%)`,
       `• RAM Tersisa: <b>${stats.memFreeMB} MB</b>`,
+      `• Storage Terpakai: <b>${stats.diskUsedGB} GB / ${stats.diskTotalGB} GB</b> (${stats.diskUsagePercent}%)`,
+      `• Storage Tersisa: <b>${stats.diskFreeGB} GB</b>`,
       `• Proses Node.js (RSS): <b>${stats.processRssMB} MB</b>`,
       `• Browser Aktif: <b>${stats.activeBrowserSessions} sesi</b>`,
       `• Uptime Bot: <b>${formatUptime(stats.uptimeSeconds)}</b>`,
