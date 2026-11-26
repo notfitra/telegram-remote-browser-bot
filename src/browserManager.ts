@@ -47,6 +47,11 @@ export class BrowserManager {
     const context = await chromium.launchPersistentContext(userDataDir, {
       headless: false,
       viewport: { width: 1280, height: 720 },
+      ignoreDefaultArgs: ['--enable-automation'],
+      userAgent:
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
+      locale: 'id-ID',
+      timezoneId: 'Asia/Jakarta',
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -57,6 +62,32 @@ export class BrowserManager {
         '--window-position=0,0',
         '--window-size=1280,720',
       ],
+    });
+
+    // Anti-bot & Stealth injection agar Twitch mengenali sebagai Google Chrome asli
+    await context.addInitScript(() => {
+      // 1. Hapus flag navigator.webdriver
+      Object.defineProperty(navigator, 'webdriver', {
+        get: () => undefined,
+      });
+
+      // 2. Mock window.chrome runtime
+      (window as any).chrome = {
+        app: { isInstalled: false },
+        runtime: {},
+        loadTimes: function () {},
+        csi: function () {},
+      };
+
+      // 3. Mock navigator.plugins
+      Object.defineProperty(navigator, 'plugins', {
+        get: () => [1, 2, 3, 4, 5],
+      });
+
+      // 4. Mock navigator.languages
+      Object.defineProperty(navigator, 'languages', {
+        get: () => ['id-ID', 'id', 'en-US', 'en'],
+      });
     });
 
     const pages = context.pages();

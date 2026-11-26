@@ -67,7 +67,20 @@ export function createServer(
     ws: true,
     pathRewrite: { '^/novnc': '' },
   });
-  app.use('/novnc', vncProxy);
+
+  // Proteksi /novnc: tolak akses langsung dari browser luar tanpa referer sah
+  app.use('/novnc', (req, res, next) => {
+    if (req.headers.upgrade === 'websocket') {
+      return next();
+    }
+    const referer = req.headers.referer || '';
+    const host = req.headers.host || '';
+    if (!referer.includes(host)) {
+      res.status(403).send('Akses ditolak: Komponen ini hanya dapat dimuat melalui Telegram Mini App.');
+      return;
+    }
+    next();
+  }, vncProxy);
 
   const requireTgAuth = (
     req: AuthenticatedRequest,

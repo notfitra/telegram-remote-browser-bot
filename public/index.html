@@ -318,28 +318,101 @@
       color: var(--accent-text);
     }
 
-    .toast {
-      position: fixed;
-      top: 14px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #1e293b;
-      color: #fff;
-      padding: 9px 14px;
+    /* LOCK SCREEN (Khusus Akses di Luar Telegram) */
+    .lock-container {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      min-height: 80vh;
+      padding: 20px;
+    }
+
+    .lock-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 40px 24px;
+      text-align: center;
+      max-width: 440px;
+      width: 100%;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+    }
+
+    .lock-icon {
+      font-size: 56px;
+      margin-bottom: 16px;
+    }
+
+    .lock-card h2 {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: var(--text);
+    }
+
+    .lock-card p {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+
+    .lock-badge {
+      display: inline-block;
+      background: rgba(145, 70, 255, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(145, 70, 255, 0.3);
+      padding: 5px 14px;
       border-radius: 999px;
       font-size: 12px;
       font-weight: 600;
-      z-index: 100;
+      margin-bottom: 26px;
+    }
+
+    .lock-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      background: var(--accent);
+      color: var(--accent-text);
+      text-decoration: none;
+      padding: 13px 20px;
+      border-radius: 14px;
+      font-size: 15px;
+      font-weight: 600;
+      transition: opacity 0.15s;
+    }
+
+    .lock-button:hover {
+      opacity: 0.9;
+    }
+
+    #app-root {
       display: none;
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
     }
   </style>
 </head>
 <body>
   <div id="toast" class="toast"></div>
 
-  <!-- VIEW 1: DASHBOARD BENTO -->
-  <section id="view-dashboard" class="view active">
+  <!-- LOCK SCREEN (HANYA MUNCUL JIKA DIBUKA DI LUAR TELEGRAM) -->
+  <div id="lock-screen" class="lock-container">
+    <div class="lock-card">
+      <div class="lock-icon">🔒</div>
+      <h2>Akses Terkunci</h2>
+      <p>Layanan ini adalah <b>Telegram Mini App</b> dan hanya dapat diakses melalui aplikasi resmi Telegram.</p>
+      <div class="lock-badge">Telegram WebApp Only</div>
+      <a href="https://t.me/PerambanBot" class="lock-button">
+        Buka di @PerambanBot
+      </a>
+    </div>
+  </div>
+
+  <div id="app-root">
+    <!-- VIEW 1: DASHBOARD BENTO -->
+    <section id="view-dashboard" class="view active">
     <div class="header-bar">
       <div class="header-title">Remote Browser</div>
       <div class="status-pill">
@@ -440,42 +513,54 @@
     <div id="bookmark-list" class="bookmark-list"></div>
   </section>
 
-  <!-- FLOATING PILL BOTTOM NAVIGATION -->
-  <nav class="bottom-pill-nav">
-    <button class="nav-pill active" data-view="dashboard" onclick="switchView('dashboard')">Dashboard</button>
-    <button class="nav-pill" data-view="browser" onclick="switchView('browser')">Browser</button>
-    <button class="nav-pill" data-view="sessions" onclick="switchView('sessions')">Sesi</button>
-  </nav>
+    <!-- FLOATING PILL BOTTOM NAVIGATION -->
+    <nav class="bottom-pill-nav">
+      <button class="nav-pill active" data-view="dashboard" onclick="switchView('dashboard')">Dashboard</button>
+      <button class="nav-pill" data-view="browser" onclick="switchView('browser')">Browser</button>
+      <button class="nav-pill" data-view="sessions" onclick="switchView('sessions')">Sesi</button>
+    </nav>
+  </div>
 
   <script>
     const tg = window.Telegram?.WebApp;
-    if (tg) {
-      tg.ready();
+    const initData = tg?.initData || '';
 
-      // Deteksi otomatis platform: Telegram Desktop vs Smartphone/HP
-      const isDesktop = (() => {
-        const p = (tg.platform || '').toLowerCase();
-        if (['tdesktop', 'macos', 'weba', 'webk', 'web'].includes(p)) return true;
-        if (['android', 'ios'].includes(p)) return false;
-        // Fallback cek user-agent jika platform tidak terdefinisi
-        return !/android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent.toLowerCase());
-      })();
+    // KUNCI: Cek apakah halaman dibuka melalui Telegram Mini App
+    if (!initData) {
+      document.getElementById('lock-screen').style.display = 'flex';
+      document.getElementById('app-root').style.display = 'none';
+      const nav = document.querySelector('.bottom-pill-nav');
+      if (nav) nav.style.display = 'none';
+      throw new Error('Akses diblokir: Halaman hanya dapat dibuka melalui Telegram Mini App.');
+    }
 
-      if (isDesktop) {
-        // 1. Telegram Desktop: Aktifkan Full Screen & tata letak lebar
-        document.body.classList.add('platform-desktop');
-        if (typeof tg.requestFullscreen === 'function') {
-          try {
-            tg.requestFullscreen();
-          } catch (e) {
-            console.warn('requestFullscreen error', e);
-          }
+    // Jika dibuka dari Telegram resmi:
+    document.getElementById('app-root').style.display = 'block';
+    tg.ready();
+
+    // Deteksi otomatis platform: Telegram Desktop vs Smartphone/HP
+    const isDesktop = (() => {
+      const p = (tg.platform || '').toLowerCase();
+      if (['tdesktop', 'macos', 'weba', 'webk', 'web'].includes(p)) return true;
+      if (['android', 'ios'].includes(p)) return false;
+      // Fallback cek user-agent jika platform tidak terdefinisi
+      return !/android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent.toLowerCase());
+    })();
+
+    if (isDesktop) {
+      // 1. Telegram Desktop: Aktifkan Full Screen & tata letak lebar
+      document.body.classList.add('platform-desktop');
+      if (typeof tg.requestFullscreen === 'function') {
+        try {
+          tg.requestFullscreen();
+        } catch (e) {
+          console.warn('requestFullscreen error', e);
         }
       }
-
-      // 2. Smartphone/HP: Tidak ada perubahan rasa (hanya expand standar)
-      tg.expand();
     }
+
+    // 2. Smartphone/HP: Tidak ada perubahan rasa (hanya expand standar)
+    tg.expand();
 
     let vncLoaded = false;
 
