@@ -1,0 +1,26 @@
+{
+  "name": "telegram-remote-browser-bot",
+  "version": "1.0.0",
+  "description": "Telegram Mini App & grammY bot untuk login web persisten dan menonton Twitch Drops di background dengan MongoDB",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "grammy": "^1.35.0",
+    "http-proxy-middleware": "^3.0.3",
+    "mongodb": "^6.12.0",
+    "playwright": "^1.50.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
