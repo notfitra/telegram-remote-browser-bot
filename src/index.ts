@@ -1,10 +1,11 @@
 import 'dotenv/config';
 import http from 'node:http';
+import net from 'node:net';
 import { DisplayManager } from './displayManager';
 import { BrowserManager } from './browserManager';
 import { createBot } from './bot';
 import { closeDb, connectDb } from './db';
-import { createServer, verifyVncAuth } from './server';
+import { createServer, extractTelegramIdFromRequest } from './server';
 
 function getRequiredEnv(name: string): string {
   const val = process.env[name]?.trim();
@@ -45,16 +46,47 @@ async function main() {
   const { app, vncProxy } = createServer(botToken, browserManager, displayManager, allowedIds);
   const server = http.createServer(app);
 
-  // Dukung upgrade WebSocket untuk noVNC (/novnc/websockify) HANYA untuk user terverifikasi
-  server.on('upgrade', (req, socket, head) => {
+  // Dukung upgrade WebSocket untuk noVNC (/novnc/websockify) terisolasi per Telegram ID
+  server.on('upgrade', async (req, clientSocket, head) => {
     if (req.url?.startsWith('/novnc')) {
-      const isAuthed = verifyVncAuth(req.headers.cookie, botToken, allowedIds);
-      if (!isAuthed) {
-        socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
-        socket.destroy();
+      const tgId = extractTelegramIdFromRequest(req, botToken, allowedIds);
+      if (!tgId) {
+        console.warn(`[noVNC WebSocket] Ditolak: Akses tidak sah (${req.url})`);
+        clientSocket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+        clientSocket.destroy();
         return;
       }
-      (vncProxy.upgrade as any)(req, socket, head);
+
+      try {
+        await displayManager.ensureDisplay(tgId);
+        const config = displayManager.getUserDisplayConfig(tgId);
+
+        const targetSocket = net.connect(config.wsPort, '127.0.0.1', () => {
+          const rewrittenUrl = req.url?.replace(/^\/novnc/, '') || '/';
+          let rawReq = `${req.method} ${rewrittenUrl} HTTP/${req.httpVersion}\r\n`;
+          for (let i = 0; i < req.rawHeaders.length; i += 2) {
+            rawReq += `${req.rawHeaders[i]}: ${req.rawHeaders[i + 1]}\r\n`;
+          }
+          rawReq += '\r\n';
+          targetSocket.write(rawReq);
+          if (head && head.length > 0) {
+            targetSocket.write(head);
+          }
+          targetSocket.pipe(clientSocket);
+          clientSocket.pipe(targetSocket);
+        });
+
+        targetSocket.on('error', (err) => {
+          console.error(`[WebSocket Proxy Error] port ${config.wsPort}:`, err.message);
+          clientSocket.destroy();
+        });
+        clientSocket.on('error', () => {
+          targetSocket.destroy();
+        });
+      } catch (err) {
+        console.error('[WebSocket Upgrade Error]', err);
+        clientSocket.destroy();
+      }
     }
   });
 

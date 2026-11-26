@@ -53,15 +53,20 @@ function verifyTelegramInitData(initData: string, botToken: string): TelegramUse
   }
 }
 
-function getTelegramIdFromVncCookie(
-  cookieHeader: string | undefined,
+export function createVncAuthToken(telegramId: number, botToken: string): string {
+  const payload = `${telegramId}:${Date.now()}`;
+  const sig = crypto.createHmac('sha256', botToken).update(payload).digest('hex');
+  return `${payload}.${sig}`;
+}
+
+export function verifyVncAuthToken(
+  token: string | undefined,
   botToken: string,
   allowedIds: number[]
 ): number | null {
-  if (!cookieHeader) return null;
-  const match = cookieHeader.match(/(?:^|;\s*)tg_vnc_auth=([^;]+)/);
-  if (!match) return null;
-  const [tokenPayload, sig] = match[1].split('.');
+  if (!token) return null;
+  const cleanToken = token.trim();
+  const [tokenPayload, sig] = cleanToken.split('.');
   if (!tokenPayload || !sig) return null;
   const expectedSig = crypto
     .createHmac('sha256', botToken)
@@ -76,12 +81,41 @@ function getTelegramIdFromVncCookie(
   return id;
 }
 
+export function extractTelegramIdFromRequest(
+  req: { url?: string; headers: { cookie?: string } },
+  botToken: string,
+  allowedIds: number[]
+): number | null {
+  // 1. Coba baca dari query parameter (?auth=... atau ?token=...)
+  if (req.url) {
+    try {
+      const match = req.url.match(/[?&](?:auth|token)=([^&#]+)/);
+      if (match && match[1]) {
+        const decoded = decodeURIComponent(match[1]);
+        const id = verifyVncAuthToken(decoded, botToken, allowedIds);
+        if (id) return id;
+      }
+    } catch {}
+  }
+
+  // 2. Coba baca dari Cookie: tg_vnc_auth=...
+  if (req.headers?.cookie) {
+    const match = req.headers.cookie.match(/(?:^|;\s*)tg_vnc_auth=([^;]+)/);
+    if (match && match[1]) {
+      const id = verifyVncAuthToken(match[1], botToken, allowedIds);
+      if (id) return id;
+    }
+  }
+
+  return null;
+}
+
 export function verifyVncAuth(
-  cookieHeader: string | undefined,
+  req: { url?: string; headers: { cookie?: string } },
   botToken: string,
   allowedIds: number[]
 ): boolean {
-  return getTelegramIdFromVncCookie(cookieHeader, botToken, allowedIds) !== null;
+  return extractTelegramIdFromRequest(req, botToken, allowedIds) !== null;
 }
 
 export function createServer(
@@ -97,7 +131,7 @@ export function createServer(
   const vncProxy = createProxyMiddleware({
     target: 'http://127.0.0.1:6080',
     router: async (req) => {
-      const tgId = getTelegramIdFromVncCookie(req.headers.cookie, botToken, allowedIds);
+      const tgId = extractTelegramIdFromRequest(req, botToken, allowedIds);
       if (tgId) {
         await displayManager.ensureDisplay(tgId);
         const config = displayManager.getUserDisplayConfig(tgId);
@@ -106,20 +140,20 @@ export function createServer(
       return 'http://127.0.0.1:6080';
     },
     changeOrigin: true,
-    ws: true,
     pathRewrite: { '^/novnc': '' },
   });
 
   // Proteksi ketat /novnc: wajib memiliki cookie otentikasi whitelist Telegram yang sah
-  app.use('/novnc', (req, res, next) => {
+  app.use('/novnc', async (req, res, next) => {
     if (req.headers.upgrade === 'websocket') {
       return next();
     }
-    const isAuthed = verifyVncAuth(req.headers.cookie, botToken, allowedIds);
-    if (!isAuthed) {
+    const tgId = extractTelegramIdFromRequest(req, botToken, allowedIds);
+    if (!tgId) {
       res.status(403).send('Akses Ditolak: Layar browser hanya dapat diakses oleh akun Telegram terverifikasi di whitelist.');
       return;
     }
+    await displayManager.ensureDisplay(tgId);
     next();
   }, vncProxy);
 
@@ -166,6 +200,7 @@ export function createServer(
 
   app.get('/api/status', requireTgAuth, async (req: AuthenticatedRequest, res) => {
     const tgId = req.tgUser!.id;
+    await displayManager.ensureDisplay(tgId);
     const live = browserManager.getState(tgId);
     const [dbSession, bookmarks, system] = await Promise.all([
       getWatchSession(tgId),
@@ -173,11 +208,14 @@ export function createServer(
       getSystemStats(browserManager.getActiveSessionCount()),
     ]);
 
+    const vncToken = createVncAuthToken(tgId, botToken);
+
     res.json({
       live,
       dbSession,
       bookmarks,
       system,
+      vncToken,
     });
   });
 

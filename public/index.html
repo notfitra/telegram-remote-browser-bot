@@ -586,6 +586,7 @@
     tg.expand();
 
     let vncLoaded = false;
+    let currentVncToken = '';
 
     function showToast(msg) {
       const el = document.getElementById('toast');
@@ -614,20 +615,27 @@
         p.classList.toggle('active', p.dataset.view === name);
       });
 
-      if (name === 'browser' && !vncLoaded) {
-        reloadVnc();
+      if (name === 'browser') {
+        if (!vncLoaded || !currentVncToken) {
+          reloadVnc();
+        }
       }
     }
 
     function reloadVnc() {
       const iframe = document.getElementById('vnc-iframe');
-      iframe.src = '/novnc/vnc.html?autoconnect=1&resize=scale&path=novnc/websockify';
+      const authQuery = currentVncToken ? `?auth=${encodeURIComponent(currentVncToken)}` : '';
+      const wsPath = `novnc/websockify${authQuery}`;
+      iframe.src = `/novnc/vnc.html?autoconnect=1&resize=scale&path=${encodeURIComponent(wsPath)}${currentVncToken ? `&auth=${encodeURIComponent(currentVncToken)}` : ''}`;
       vncLoaded = true;
     }
 
     async function fetchStatus() {
       try {
         const data = await api('/api/status');
+        if (data.vncToken) {
+          currentVncToken = data.vncToken;
+        }
         const live = data.live;
         const dot = document.getElementById('status-dot');
         const label = document.getElementById('status-label');
