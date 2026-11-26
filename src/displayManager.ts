@@ -8,7 +8,7 @@ export interface UserDisplayConfig {
   wsPort: number;
 }
 
-export interface UserDisplaySession extends UserDisplayConfig {
+interface UserDisplaySession extends UserDisplayConfig {
   telegramId: number;
   xvfbProcess?: ChildProcess;
   vncProcess?: ChildProcess;
@@ -23,7 +23,7 @@ export class DisplayManager {
     this.allowedIds = allowedIds;
   }
 
-  getSlot(telegramId: number): number {
+  private getSlot(telegramId: number): number {
     const idx = this.allowedIds.indexOf(telegramId);
     return idx >= 0 ? idx : Math.abs(telegramId) % 100;
   }

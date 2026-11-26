@@ -53,7 +53,7 @@ function verifyTelegramInitData(initData: string, botToken: string): TelegramUse
   }
 }
 
-export function getTelegramIdFromVncCookie(
+function getTelegramIdFromVncCookie(
   cookieHeader: string | undefined,
   botToken: string,
   allowedIds: number[]

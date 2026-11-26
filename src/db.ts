@@ -28,12 +28,12 @@ export async function connectDb(uri: string): Promise<Db> {
   return db;
 }
 
-export function getSessionsCollection(): Collection<WatchSessionDoc> {
+function getSessionsCollection(): Collection<WatchSessionDoc> {
   if (!db) throw new Error('Database belum terhubung');
   return db.collection<WatchSessionDoc>('watch_sessions');
 }
 
-export function getBookmarksCollection(): Collection<SavedBookmarkDoc> {
+function getBookmarksCollection(): Collection<SavedBookmarkDoc> {
   if (!db) throw new Error('Database belum terhubung');
   return db.collection<SavedBookmarkDoc>('saved_bookmarks');
 }
