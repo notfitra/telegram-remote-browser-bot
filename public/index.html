@@ -33,6 +33,23 @@
       min-height: 100vh;
     }
 
+    /* Khusus Telegram Desktop: Tampilan Luas & Penuh */
+    body.platform-desktop {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 18px 24px 84px;
+    }
+
+    body.platform-desktop .bento-grid {
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+    }
+
+    body.platform-desktop .vnc-frame-wrap {
+      height: calc(100vh - 130px);
+      min-height: 580px;
+    }
+
     .view {
       display: none;
     }
@@ -434,6 +451,29 @@
     const tg = window.Telegram?.WebApp;
     if (tg) {
       tg.ready();
+
+      // Deteksi otomatis platform: Telegram Desktop vs Smartphone/HP
+      const isDesktop = (() => {
+        const p = (tg.platform || '').toLowerCase();
+        if (['tdesktop', 'macos', 'weba', 'webk', 'web'].includes(p)) return true;
+        if (['android', 'ios'].includes(p)) return false;
+        // Fallback cek user-agent jika platform tidak terdefinisi
+        return !/android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent.toLowerCase());
+      })();
+
+      if (isDesktop) {
+        // 1. Telegram Desktop: Aktifkan Full Screen & tata letak lebar
+        document.body.classList.add('platform-desktop');
+        if (typeof tg.requestFullscreen === 'function') {
+          try {
+            tg.requestFullscreen();
+          } catch (e) {
+            console.warn('requestFullscreen error', e);
+          }
+        }
+      }
+
+      // 2. Smartphone/HP: Tidak ada perubahan rasa (hanya expand standar)
       tg.expand();
     }
 
