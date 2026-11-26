@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import express, { NextFunction, Request, Response } from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
+import { Bot, webhookCallback } from 'grammy';
 import { BrowserManager } from './browserManager';
 import { DisplayManager } from './displayManager';
 import {
@@ -122,10 +123,20 @@ export function createServer(
   botToken: string,
   browserManager: BrowserManager,
   displayManager: DisplayManager,
-  allowedIds: number[]
+  allowedIds: number[],
+  bot: Bot,
+  webhookSecret?: string
 ) {
   const app = express();
   app.set('trust proxy', 1);
+
+  // Webhook Telegram: dipasang sebelum parser json global jika perlu, atau gunakan webhookCallback grammY
+  if (webhookSecret) {
+    app.use('/api/telegram/webhook', webhookCallback(bot, 'express', { secretToken: webhookSecret }));
+  } else {
+    app.use('/api/telegram/webhook', webhookCallback(bot, 'express'));
+  }
+
   app.use(express.json());
 
   const vncProxy = createProxyMiddleware({
@@ -279,6 +290,27 @@ export function createServer(
     } catch (err) {
       res.status(500).json({
         error: err instanceof Error ? err.message : 'Gagal menyetel auth-token Twitch',
+      });
+    }
+  });
+
+  app.post('/api/cookie', requireTgAuth, async (req: AuthenticatedRequest, res) => {
+    const { url, cookie } = req.body as { url?: string; cookie?: string };
+    if (!url || !url.trim() || !cookie || !cookie.trim()) {
+      res.status(400).json({ error: 'URL dan data cookie wajib diisi' });
+      return;
+    }
+
+    try {
+      const state = await browserManager.setCustomCookies(
+        req.tgUser!.id,
+        url.trim(),
+        cookie.trim()
+      );
+      res.json({ ok: true, state });
+    } catch (err) {
+      res.status(500).json({
+        error: err instanceof Error ? err.message : 'Gagal memasang cookie',
       });
     }
   });

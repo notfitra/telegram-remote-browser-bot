@@ -221,6 +221,106 @@ export class BrowserManager {
     });
   }
 
+  async setCustomCookies(
+    telegramId: number,
+    targetUrl: string,
+    rawCookie: string
+  ): Promise<BrowserState> {
+    const session = await this.ensureContext(telegramId);
+    const normalizedUrl = targetUrl.startsWith('http://') || targetUrl.startsWith('https://')
+      ? targetUrl
+      : `https://${targetUrl}`;
+
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(normalizedUrl);
+    } catch {
+      throw new Error(`URL target tidak valid: ${targetUrl}`);
+    }
+
+    const domain = parsedUrl.hostname.startsWith('.') ? parsedUrl.hostname : `.${parsedUrl.hostname}`;
+    const cleanCookie = rawCookie.trim();
+    const cookiesToAdd: Array<{
+      name: string;
+      value: string;
+      domain: string;
+      path: string;
+      secure?: boolean;
+      httpOnly?: boolean;
+      sameSite?: 'Lax' | 'None' | 'Strict';
+    }> = [];
+
+    // Format 1: Format JSON (ekstensi EditThisCookie / Cookie-Editor)
+    if (cleanCookie.startsWith('[') || cleanCookie.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(cleanCookie);
+        const list = Array.isArray(parsed) ? parsed : [parsed];
+        for (const item of list) {
+          if (item && item.name && item.value !== undefined) {
+            cookiesToAdd.push({
+              name: String(item.name),
+              value: String(item.value),
+              domain: item.domain || domain,
+              path: item.path || '/',
+              secure: item.secure ?? true,
+              httpOnly: item.httpOnly ?? false,
+              sameSite: 'Lax',
+            });
+          }
+        }
+      } catch {
+        // Fallback jika parse JSON gagal
+      }
+    }
+
+    // Format 2: Format String (name=val atau name1=val1; name2=val2 atau token murni)
+    if (cookiesToAdd.length === 0) {
+      const pairs = cleanCookie.split(';');
+      for (const pair of pairs) {
+        const trimmed = pair.trim();
+        if (!trimmed) continue;
+        const eqIdx = trimmed.indexOf('=');
+        if (eqIdx > 0) {
+          const name = trimmed.substring(0, eqIdx).trim();
+          const value = trimmed.substring(eqIdx + 1).trim();
+          cookiesToAdd.push({
+            name,
+            value,
+            domain,
+            path: '/',
+            secure: true,
+            httpOnly: false,
+            sameSite: 'Lax',
+          });
+        } else {
+          const defaultName = domain.includes('twitch.tv') ? 'auth-token' : 'session_token';
+          cookiesToAdd.push({
+            name: defaultName,
+            value: trimmed,
+            domain,
+            path: '/',
+            secure: true,
+            httpOnly: false,
+            sameSite: 'Lax',
+          });
+        }
+      }
+    }
+
+    if (cookiesToAdd.length === 0) {
+      throw new Error('Data cookie kosong atau format tidak dikenali');
+    }
+
+    await session.context.addCookies(cookiesToAdd);
+
+    const platform = domain.includes('twitch.tv') ? 'twitch' : 'custom';
+    return await this.openUrl(telegramId, normalizedUrl, {
+      platform,
+      label: `${parsedUrl.hostname} (Cookie Injected)`,
+      watchInBackground: false,
+    });
+  }
+
   async watchTwitchChannel(
     telegramId: number,
     channelInput: string,

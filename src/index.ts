@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import crypto from 'node:crypto';
 import http from 'node:http';
 import net from 'node:net';
 import { DisplayManager } from './displayManager';
@@ -43,7 +44,11 @@ async function main() {
   const browserManager = new BrowserManager(profilesDir, displayManager);
   await browserManager.resumeActiveSessions();
 
-  const { app, vncProxy } = createServer(botToken, browserManager, displayManager, allowedIds);
+  const bot = createBot(botToken, webAppUrl, browserManager, allowedIds);
+  // Buat secret token 32 karakter untuk verifikasi update Telegram webhook
+  const webhookSecret = crypto.createHash('sha256').update(botToken).digest('hex').substring(0, 32);
+
+  const { app } = createServer(botToken, browserManager, displayManager, allowedIds, bot, webhookSecret);
   const server = http.createServer(app);
 
   // Dukung upgrade WebSocket untuk noVNC (/novnc/websockify) terisolasi per Telegram ID
@@ -90,20 +95,25 @@ async function main() {
     }
   });
 
-  server.listen(port, () => {
+  server.listen(port, async () => {
     console.log(`[Server] Mini App & API berjalan di port ${port}`);
-  });
 
-  const bot = createBot(botToken, webAppUrl, browserManager, allowedIds);
-  bot.start({
-    onStart: (botInfo) => {
-      console.log(`[Bot] @${botInfo.username} aktif (long polling)`);
-    },
+    // Daftarkan Webhook ke Telegram secara otomatis menggunakan WEBAPP_URL
+    const webhookUrl = `${webAppUrl.replace(/\/$/, '')}/api/telegram/webhook`;
+    try {
+      await bot.api.setWebhook(webhookUrl, {
+        drop_pending_updates: true,
+        secret_token: webhookSecret,
+      });
+      const botInfo = await bot.api.getMe();
+      console.log(`[Bot] @${botInfo.username} aktif via Webhook (Hemat Resource): ${webhookUrl}`);
+    } catch (err) {
+      console.error('[Bot] Gagal mendaftarkan webhook Telegram:', err);
+    }
   });
 
   const shutdown = async () => {
     console.log('[System] Mematikan layanan...');
-    await bot.stop();
     await browserManager.closeAll();
     displayManager.stopAll();
     await closeDb();

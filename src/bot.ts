@@ -40,6 +40,7 @@ export function createBot(
         '• /watch &lt;channel&gt; — Tonton channel Twitch di background',
         '• /open &lt;url&gt; — Buka situs web bebas di background 24/7',
         '• /token &lt;auth_token&gt; — Login instan Twitch via cookie (bebas blokir)',
+        '• /cookie &lt;url&gt; &lt;cookie&gt; — Login instan situs apa pun via cookie / JSON',
         '• /status — Cek status sesi aktif Anda',
         '• /usage — Cek pemakaian RAM &amp; CPU server real-time',
         '• /stop — Hentikan sesi tonton (profil login tetap tersimpan)',
@@ -103,6 +104,57 @@ export function createBot(
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       await ctx.reply(`Gagal login via token: ${msg}`);
+    }
+  });
+
+  bot.command('cookie', async (ctx) => {
+    if (!ctx.from) return;
+    const match = ctx.match?.trim();
+    if (!match) {
+      await ctx.reply(
+        [
+          '<b>Format perintah /cookie:</b>',
+          '<code>/cookie &lt;url&gt; &lt;cookie&gt;</code>',
+          '',
+          '<b>Contoh 1 (Format name=value):</b>',
+          '<code>/cookie https://kick.com session_token=abc123456</code>',
+          '',
+          '<b>Contoh 2 (Beberapa cookie):</b>',
+          '<code>/cookie https://kick.com auth=xyz; session=123</code>',
+          '',
+          '<b>Contoh 3 (Format JSON dari ekstensi Cookie-Editor):</b>',
+          '<code>/cookie https://site.com [{"name":"auth","value":"xyz"}]</code>',
+        ].join('\n'),
+        { parse_mode: 'HTML' }
+      );
+      return;
+    }
+
+    const firstSpace = match.indexOf(' ');
+    if (firstSpace === -1) {
+      await ctx.reply(
+        'Format salah. Sertakan nilai cookie setelah URL.\nContoh: <code>/cookie https://kick.com auth=123</code>',
+        { parse_mode: 'HTML' }
+      );
+      return;
+    }
+
+    const url = match.substring(0, firstSpace).trim();
+    const cookieData = match.substring(firstSpace + 1).trim();
+
+    await ctx.reply(`Memasang cookie untuk <code>${url}</code> ke browser server...`, {
+      parse_mode: 'HTML',
+    });
+
+    try {
+      const state = await browserManager.setCustomCookies(ctx.from.id, url, cookieData);
+      await ctx.reply(
+        `✅ <b>Berhasil memasang cookie!</b>\nBrowser server kini membuka <code>${state.currentUrl}</code>.`,
+        { parse_mode: 'HTML' }
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      await ctx.reply(`Gagal memasang cookie: ${msg}`);
     }
   });
 
