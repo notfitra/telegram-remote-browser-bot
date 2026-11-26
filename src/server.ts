@@ -177,6 +177,23 @@ export function createServer(
     }
   });
 
+  app.post('/api/twitch/token', requireTgAuth, async (req: AuthenticatedRequest, res) => {
+    const { token } = req.body as { token?: string };
+    if (!token || !token.trim()) {
+      res.status(400).json({ error: 'Token login Twitch wajib diisi' });
+      return;
+    }
+
+    try {
+      const state = await browserManager.setTwitchAuthToken(req.tgUser!.id, token.trim());
+      res.json({ ok: true, state });
+    } catch (err) {
+      res.status(500).json({
+        error: err instanceof Error ? err.message : 'Gagal menyetel auth-token Twitch',
+      });
+    }
+  });
+
   app.post('/api/stop', requireTgAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const state = await browserManager.stopWatching(req.tgUser!.id);

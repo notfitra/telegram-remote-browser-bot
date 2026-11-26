@@ -49,7 +49,7 @@ export class BrowserManager {
       viewport: { width: 1280, height: 720 },
       ignoreDefaultArgs: ['--enable-automation'],
       userAgent:
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
       locale: 'id-ID',
       timezoneId: 'Asia/Jakarta',
       args: [
@@ -67,6 +67,9 @@ export class BrowserManager {
     // Anti-bot & Stealth injection agar Twitch mengenali sebagai Google Chrome asli
     await context.addInitScript(() => {
       // 1. Hapus flag navigator.webdriver
+      try {
+        delete (Object.getPrototypeOf(navigator) as any).webdriver;
+      } catch {}
       Object.defineProperty(navigator, 'webdriver', {
         get: () => undefined,
       });
@@ -185,6 +188,27 @@ export class BrowserManager {
     }
 
     return managed.state;
+  }
+
+  async setTwitchAuthToken(telegramId: number, token: string): Promise<BrowserState> {
+    const session = await this.ensureContext(telegramId);
+    const cleanToken = token.trim().replace(/^oauth:/, '');
+    await session.context.addCookies([
+      {
+        name: 'auth-token',
+        value: cleanToken,
+        domain: '.twitch.tv',
+        path: '/',
+        secure: true,
+        httpOnly: false,
+        sameSite: 'Lax',
+      },
+    ]);
+    return await this.openUrl(telegramId, 'https://www.twitch.tv', {
+      platform: 'twitch',
+      label: 'Twitch (Logged In)',
+      watchInBackground: false,
+    });
   }
 
   async watchTwitchChannel(

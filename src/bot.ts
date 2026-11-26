@@ -36,6 +36,7 @@ export function createBot(
         'Perintah cepat:',
         '• /watch &lt;channel&gt; — Tonton channel Twitch di background',
         '• /open &lt;url&gt; — Buka situs web bebas di background 24/7',
+        '• /token &lt;auth_token&gt; — Login instan Twitch via cookie (bebas blokir)',
         '• /status — Cek status sesi aktif Anda',
         '• /usage — Cek pemakaian RAM &amp; CPU server real-time',
         '• /stop — Hentikan sesi tonton (profil login tetap tersimpan)',
@@ -75,6 +76,30 @@ export function createBot(
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       await ctx.reply(`Gagal membuka channel: ${msg}`);
+    }
+  });
+
+  bot.command('token', async (ctx) => {
+    if (!ctx.from) return;
+    const token = ctx.match?.trim();
+    if (!token) {
+      await ctx.reply(
+        'Format perintah:\n<code>/token &lt;auth-token_twitch&gt;</code>\n\n<i>Contoh: Salin nilai cookie "auth-token" dari twitch.tv di browser Anda lalu kirim ke sini.</i>',
+        { parse_mode: 'HTML' }
+      );
+      return;
+    }
+
+    await ctx.reply('Memasang token login Twitch ke browser server...');
+    try {
+      await browserManager.setTwitchAuthToken(ctx.from.id, token);
+      await ctx.reply(
+        '✅ <b>Berhasil Login ke Twitch!</b>\nBrowser Anda sekarang sudah masuk ke akun Twitch Anda.',
+        { parse_mode: 'HTML' }
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      await ctx.reply(`Gagal login via token: ${msg}`);
     }
   });
 

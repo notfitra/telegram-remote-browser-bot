@@ -456,6 +456,17 @@
       </div>
 
       <div class="bento-card span-2">
+        <div class="card-label">Login Instan Twitch via Auth-Token</div>
+        <div class="card-sub">
+          Alternatif jika form login Twitch dibatasi IP datacenter: tempel cookie <code>auth-token</code> Twitch Anda di sini.
+        </div>
+        <div class="input-row">
+          <input id="twitch-token-input" type="password" placeholder="Tempel cookie auth-token..." />
+          <button class="btn secondary" onclick="submitTwitchToken()">Set Token</button>
+        </div>
+      </div>
+
+      <div class="bento-card span-2">
         <div class="card-label">Buka Web Bebas (Non-Twitch)</div>
         <div class="input-row">
           <input id="custom-url-input" type="url" placeholder="https://kick.com atau URL lain" />
@@ -669,6 +680,27 @@
         input.value = '';
         showToast('Channel dibuka di background');
         await fetchStatus();
+      } catch (err) {
+        showToast(err.message);
+      }
+    }
+
+    async function submitTwitchToken() {
+      const input = document.getElementById('twitch-token-input');
+      const token = input.value.trim();
+      if (!token) return showToast('Masukkan cookie auth-token Twitch');
+
+      showToast('Memasang token login Twitch...');
+      try {
+        await api('/api/twitch/token', {
+          method: 'POST',
+          body: JSON.stringify({ token }),
+        });
+        input.value = '';
+        showToast('Berhasil Login ke Twitch!');
+        await fetchStatus();
+        switchView('browser');
+        reloadVnc();
       } catch (err) {
         showToast(err.message);
       }
