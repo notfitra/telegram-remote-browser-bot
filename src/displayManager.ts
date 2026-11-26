@@ -43,8 +43,19 @@ export class DisplayManager {
 
   async ensureDisplay(telegramId: number): Promise<UserDisplaySession> {
     const existing = this.sessions.get(telegramId);
-    if (existing && existing.xvfbProcess && !existing.xvfbProcess.killed) {
+    const isHealthy =
+      existing &&
+      existing.xvfbProcess && !existing.xvfbProcess.killed && existing.xvfbProcess.exitCode === null &&
+      existing.vncProcess && !existing.vncProcess.killed && existing.vncProcess.exitCode === null &&
+      existing.wsProcess && !existing.wsProcess.killed && existing.wsProcess.exitCode === null;
+
+    if (isHealthy) {
       return existing;
+    }
+
+    // Jika salah satu proses mati/terputus setelah berjam-jam, bersihkan sisa sebelum restart
+    if (existing) {
+      this.stopDisplay(telegramId);
     }
 
     const config = this.getUserDisplayConfig(telegramId);

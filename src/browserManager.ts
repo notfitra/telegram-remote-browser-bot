@@ -399,6 +399,20 @@ export class BrowserManager {
     managed.heartbeatTimer = setInterval(async () => {
       try {
         await managed.page.evaluate(() => {
+          // 1. Klik otomatis tombol konfirmasi "Still Watching" Twitch jika muncul setelah berjam-jam
+          const buttons = document.querySelectorAll('button');
+          for (const btn of buttons) {
+            const txt = (btn.textContent || '').toLowerCase();
+            const target = btn.getAttribute('data-a-target') || '';
+            if (
+              txt.includes('still watching') ||
+              target === 'player-overlay-still-watching-button'
+            ) {
+              btn.click();
+            }
+          }
+
+          // 2. Pastikan video selalu diputar
           const video = document.querySelector('video');
           if (video && video.paused) {
             video.play().catch(() => {});

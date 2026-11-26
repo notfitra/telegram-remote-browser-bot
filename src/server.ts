@@ -83,11 +83,11 @@ export function verifyVncAuthToken(
 }
 
 export function extractTelegramIdFromRequest(
-  req: { url?: string; headers: { cookie?: string } },
+  req: { url?: string; headers: { cookie?: string; referer?: string } },
   botToken: string,
   allowedIds: number[]
 ): number | null {
-  // 1. Coba baca dari query parameter (?auth=... atau ?token=...)
+  // 1. Coba baca dari query parameter URL (?auth=... atau ?token=...)
   if (req.url) {
     try {
       const match = req.url.match(/[?&](?:auth|token)=([^&#]+)/);
@@ -99,7 +99,19 @@ export function extractTelegramIdFromRequest(
     } catch {}
   }
 
-  // 2. Coba baca dari Cookie: tg_vnc_auth=...
+  // 2. Coba baca dari header Referer (untuk sub-resources CSS/JS/images yang dipanggil vnc.html)
+  if (req.headers?.referer) {
+    try {
+      const match = req.headers.referer.match(/[?&](?:auth|token)=([^&#]+)/);
+      if (match && match[1]) {
+        const decoded = decodeURIComponent(match[1]);
+        const id = verifyVncAuthToken(decoded, botToken, allowedIds);
+        if (id) return id;
+      }
+    } catch {}
+  }
+
+  // 3. Coba baca dari Cookie: tg_vnc_auth=...
   if (req.headers?.cookie) {
     const match = req.headers.cookie.match(/(?:^|;\s*)tg_vnc_auth=([^;]+)/);
     if (match && match[1]) {
@@ -112,7 +124,7 @@ export function extractTelegramIdFromRequest(
 }
 
 export function verifyVncAuth(
-  req: { url?: string; headers: { cookie?: string } },
+  req: { url?: string; headers: { cookie?: string; referer?: string } },
   botToken: string,
   allowedIds: number[]
 ): boolean {
@@ -153,12 +165,22 @@ export function createServer(
     pathRewrite: { '^/novnc': '' },
   });
 
-  // Proteksi ketat /novnc: wajib memiliki cookie otentikasi whitelist Telegram yang sah
+  // Proteksi /novnc: aset statis UI selalu diizinkan, streaming & kontrol dikunci whitelist
   app.use('/novnc', async (req, res, next) => {
     if (req.headers.upgrade === 'websocket') {
       return next();
     }
+
+    const isStaticAsset = /\.(css|js|png|svg|ico|woff2?|map|json)$/i.test(req.path);
     const tgId = extractTelegramIdFromRequest(req, botToken, allowedIds);
+
+    if (isStaticAsset) {
+      if (tgId) {
+        displayManager.ensureDisplay(tgId).catch(() => {});
+      }
+      return next();
+    }
+
     if (!tgId) {
       res.status(403).send('Akses Ditolak: Layar browser hanya dapat diakses oleh akun Telegram terverifikasi di whitelist.');
       return;

@@ -622,8 +622,14 @@
       }
     }
 
-    function reloadVnc() {
+    async function reloadVnc() {
       const iframe = document.getElementById('vnc-iframe');
+      if (!currentVncToken) {
+        try {
+          const data = await api('/api/status');
+          if (data.vncToken) currentVncToken = data.vncToken;
+        } catch {}
+      }
       const authQuery = currentVncToken ? `?auth=${encodeURIComponent(currentVncToken)}` : '';
       const wsPath = `novnc/websockify${authQuery}`;
       iframe.src = `/novnc/vnc.html?autoconnect=1&resize=scale&path=${encodeURIComponent(wsPath)}${currentVncToken ? `&auth=${encodeURIComponent(currentVncToken)}` : ''}`;
