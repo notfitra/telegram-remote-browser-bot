@@ -647,7 +647,7 @@
           live.channelName ? `twitch.tv/${live.channelName}` : (live.currentUrl || '-');
 
         const hb = data.dbSession?.lastHeartbeatAt
-          ? new Date(data.dbSession.lastHeartbeatAt).toLocaleTimeString('id-ID')
+          ? new Date(data.dbSession.lastHeartbeatAt).toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB'
           : '-';
         document.getElementById('last-heartbeat').textContent = hb;
 

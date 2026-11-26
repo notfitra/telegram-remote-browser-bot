@@ -1,6 +1,7 @@
 FROM mcr.microsoft.com/playwright:v1.55.1-noble
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Jakarta
 ENV DISPLAY=:99
 # Cegah npm install mendownload ulang browser bawaan
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1

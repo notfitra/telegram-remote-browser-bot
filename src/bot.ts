@@ -198,7 +198,7 @@ export function createBot(
       `• URL Aktif: <code>${live.currentUrl}</code>`,
       live.channelName ? `• Channel: <b>${live.channelName}</b>` : null,
       dbDoc?.lastHeartbeatAt
-        ? `• Heartbeat terakhir: ${dbDoc.lastHeartbeatAt.toLocaleString('id-ID')}`
+        ? `• Heartbeat terakhir: ${dbDoc.lastHeartbeatAt.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB`
         : null,
     ]
       .filter(Boolean)
