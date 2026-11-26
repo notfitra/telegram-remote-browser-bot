@@ -54,13 +54,13 @@ export class BrowserManager {
       timezoneId: 'Asia/Jakarta',
       args: [
         '--no-sandbox',
-        '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-blink-features=AutomationControlled',
         '--autoplay-policy=no-user-gesture-required',
         '--mute-audio',
         '--window-position=0,0',
         '--window-size=1280,720',
+        '--test-type',
       ],
     });
 
