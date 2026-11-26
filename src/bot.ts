@@ -12,8 +12,11 @@ export function createBot(
   const bot = new Bot(token);
 
   bot.use(async (ctx, next) => {
-    if (allowedIds.length > 0 && ctx.from && !allowedIds.includes(ctx.from.id)) {
-      await ctx.reply('Akses ditolak. Akun Telegram Anda belum terdaftar di whitelist.');
+    if (!ctx.from || !allowedIds.includes(ctx.from.id)) {
+      await ctx.reply(
+        `⛔ <b>Akses Ditolak</b>\nAkun Telegram Anda (ID: <code>${ctx.from?.id || 'Unknown'}</code>) belum terdaftar di whitelist bot ini.\n\nHubungi pemilik server untuk menambahkan Telegram ID Anda ke dalam file <code>.env</code>.`,
+        { parse_mode: 'HTML' }
+      );
       return;
     }
     await next();

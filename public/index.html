@@ -664,6 +664,20 @@
 
         renderBookmarks(data.bookmarks || []);
       } catch (err) {
+        if (err.message && (err.message.includes('whitelist') || err.message.includes('Akses ditolak'))) {
+          document.getElementById('lock-screen').style.display = 'flex';
+          document.getElementById('lock-screen').innerHTML = `
+            <div class="lock-card">
+              <div class="lock-icon">⛔</div>
+              <h2>Akses Ditolak</h2>
+              <p>${err.message}</p>
+            </div>
+          `;
+          document.getElementById('app-root').style.display = 'none';
+          const nav = document.querySelector('.bottom-pill-nav');
+          if (nav) nav.style.display = 'none';
+          return;
+        }
         showToast(err.message);
       }
     }

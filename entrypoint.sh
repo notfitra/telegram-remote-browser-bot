@@ -1,22 +1,8 @@
 #!/bin/bash
 set -e
 
-rm -f /tmp/.X99-lock
+# Bersihkan sisa lock display X lama jika container direstart
+rm -f /tmp/.X*-lock /tmp/.X11-unix/X* 2>/dev/null || true
 
-# 1. Jalankan virtual display Xvfb
-Xvfb :99 -screen 0 1280x720x24 -ac +extension GLX +render -noreset &
-sleep 1
-
-# 2. Jalankan window manager jika terinstall
-if command -v fluxbox >/dev/null 2>&1; then
-  fluxbox &
-fi
-
-# 3. Jalankan x11vnc pada display :99
-x11vnc -display :99 -forever -shared -nopw -rfbport 5900 -quiet &
-
-# 4. Jalankan websockify + noVNC di port 6080 (di-proxy oleh Express ke /novnc)
-websockify --web=/usr/share/novnc/ 6080 localhost:5900 &
-
-# 5. Jalankan aplikasi Node.js (grammY + Express + Playwright)
+# Jalankan aplikasi Node.js (Display Xvfb, x11vnc, dan websockify dikelola on-demand terisolasi per user oleh DisplayManager)
 exec node dist/index.js

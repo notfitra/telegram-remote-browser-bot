@@ -1,9 +1,10 @@
 import 'dotenv/config';
 import http from 'node:http';
+import { DisplayManager } from './displayManager';
 import { BrowserManager } from './browserManager';
 import { createBot } from './bot';
 import { closeDb, connectDb } from './db';
-import { createServer } from './server';
+import { createServer, verifyVncAuth } from './server';
 
 function getRequiredEnv(name: string): string {
   const val = process.env[name]?.trim();
@@ -29,17 +30,30 @@ async function main() {
     .map((s) => Number(s.trim()))
     .filter((n) => Number.isFinite(n) && n > 0);
 
+  if (allowedIds.length === 0) {
+    throw new Error(
+      'FATAL KEAMANAN: ALLOWED_TELEGRAM_IDS wajib diisi di .env! Masukkan Telegram ID Anda untuk mencegah orang asing mengakses browser Anda.'
+    );
+  }
+
   await connectDb(mongoUri);
 
-  const browserManager = new BrowserManager(profilesDir);
+  const displayManager = new DisplayManager(allowedIds);
+  const browserManager = new BrowserManager(profilesDir, displayManager);
   await browserManager.resumeActiveSessions();
 
-  const { app, vncProxy } = createServer(botToken, browserManager, allowedIds);
+  const { app, vncProxy } = createServer(botToken, browserManager, displayManager, allowedIds);
   const server = http.createServer(app);
 
-  // Dukung upgrade WebSocket untuk noVNC (/novnc/websockify)
+  // Dukung upgrade WebSocket untuk noVNC (/novnc/websockify) HANYA untuk user terverifikasi
   server.on('upgrade', (req, socket, head) => {
     if (req.url?.startsWith('/novnc')) {
+      const isAuthed = verifyVncAuth(req.headers.cookie, botToken, allowedIds);
+      if (!isAuthed) {
+        socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+        socket.destroy();
+        return;
+      }
       (vncProxy.upgrade as any)(req, socket, head);
     }
   });
@@ -59,6 +73,7 @@ async function main() {
     console.log('[System] Mematikan layanan...');
     await bot.stop();
     await browserManager.closeAll();
+    displayManager.stopAll();
     await closeDb();
     server.close(() => process.exit(0));
   };

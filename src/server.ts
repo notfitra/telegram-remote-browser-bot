@@ -3,6 +3,7 @@ import path from 'node:path';
 import express, { NextFunction, Request, Response } from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { BrowserManager } from './browserManager';
+import { DisplayManager } from './displayManager';
 import {
   deleteBookmark,
   getWatchSession,
@@ -52,9 +53,41 @@ function verifyTelegramInitData(initData: string, botToken: string): TelegramUse
   }
 }
 
+export function getTelegramIdFromVncCookie(
+  cookieHeader: string | undefined,
+  botToken: string,
+  allowedIds: number[]
+): number | null {
+  if (!cookieHeader) return null;
+  const match = cookieHeader.match(/(?:^|;\s*)tg_vnc_auth=([^;]+)/);
+  if (!match) return null;
+  const [tokenPayload, sig] = match[1].split('.');
+  if (!tokenPayload || !sig) return null;
+  const expectedSig = crypto
+    .createHmac('sha256', botToken)
+    .update(tokenPayload)
+    .digest('hex');
+  if (sig !== expectedSig) return null;
+  const [idStr, timeStr] = tokenPayload.split(':');
+  const id = Number(idStr);
+  const time = Number(timeStr);
+  if (!allowedIds.includes(id)) return null;
+  if (Date.now() - time > 86400000) return null; // Berlaku 24 jam
+  return id;
+}
+
+export function verifyVncAuth(
+  cookieHeader: string | undefined,
+  botToken: string,
+  allowedIds: number[]
+): boolean {
+  return getTelegramIdFromVncCookie(cookieHeader, botToken, allowedIds) !== null;
+}
+
 export function createServer(
   botToken: string,
   browserManager: BrowserManager,
+  displayManager: DisplayManager,
   allowedIds: number[]
 ) {
   const app = express();
@@ -63,20 +96,28 @@ export function createServer(
 
   const vncProxy = createProxyMiddleware({
     target: 'http://127.0.0.1:6080',
+    router: async (req) => {
+      const tgId = getTelegramIdFromVncCookie(req.headers.cookie, botToken, allowedIds);
+      if (tgId) {
+        await displayManager.ensureDisplay(tgId);
+        const config = displayManager.getUserDisplayConfig(tgId);
+        return `http://127.0.0.1:${config.wsPort}`;
+      }
+      return 'http://127.0.0.1:6080';
+    },
     changeOrigin: true,
     ws: true,
     pathRewrite: { '^/novnc': '' },
   });
 
-  // Proteksi /novnc: tolak akses langsung dari browser luar tanpa referer sah
+  // Proteksi ketat /novnc: wajib memiliki cookie otentikasi whitelist Telegram yang sah
   app.use('/novnc', (req, res, next) => {
     if (req.headers.upgrade === 'websocket') {
       return next();
     }
-    const referer = req.headers.referer || '';
-    const host = req.headers.host || '';
-    if (!referer.includes(host)) {
-      res.status(403).send('Akses ditolak: Komponen ini hanya dapat dimuat melalui Telegram Mini App.');
+    const isAuthed = verifyVncAuth(req.headers.cookie, botToken, allowedIds);
+    if (!isAuthed) {
+      res.status(403).send('Akses Ditolak: Layar browser hanya dapat diakses oleh akun Telegram terverifikasi di whitelist.');
       return;
     }
     next();
@@ -95,10 +136,20 @@ export function createServer(
       return;
     }
 
-    if (allowedIds.length > 0 && !allowedIds.includes(user.id)) {
-      res.status(403).json({ error: 'Akses Telegram ID dibatasi' });
+    if (!allowedIds.includes(user.id)) {
+      res.status(403).json({ error: 'Akses ditolak: Akun Telegram Anda tidak terdaftar di whitelist' });
       return;
     }
+
+    // Set cookie sesi aman untuk mengizinkan iframe /novnc dan koneksi WebSocket VNC
+    const payload = `${user.id}:${Date.now()}`;
+    const sig = crypto.createHmac('sha256', botToken).update(payload).digest('hex');
+    res.cookie('tg_vnc_auth', `${payload}.${sig}`, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: true,
+      maxAge: 86400000,
+    });
 
     req.tgUser = user;
     next();

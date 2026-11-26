@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { BrowserContext, Page, chromium } from 'playwright';
+import { DisplayManager } from './displayManager';
 import {
   addBookmark,
   deleteUserData,
@@ -21,9 +22,11 @@ interface ManagedSession {
 export class BrowserManager {
   private sessions = new Map<number, ManagedSession>();
   private profilesDir: string;
+  private displayManager: DisplayManager;
 
-  constructor(profilesDir: string) {
+  constructor(profilesDir: string, displayManager: DisplayManager) {
     this.profilesDir = profilesDir;
+    this.displayManager = displayManager;
     fs.mkdirSync(this.profilesDir, { recursive: true });
   }
 
@@ -44,11 +47,18 @@ export class BrowserManager {
     const userDataDir = this.getProfilePath(telegramId);
     fs.mkdirSync(userDataDir, { recursive: true });
 
+    // Pastikan monitor virtual Xvfb terisolasi siap untuk user ini
+    const userDisplay = await this.displayManager.ensureDisplay(telegramId);
+
     const context = await chromium.launchPersistentContext(userDataDir, {
       channel: 'chrome',
       headless: false,
       viewport: { width: 1280, height: 720 },
       ignoreDefaultArgs: ['--enable-automation'],
+      env: {
+        ...process.env,
+        DISPLAY: userDisplay.displayStr,
+      },
       userAgent:
         'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
       locale: 'id-ID',
@@ -329,6 +339,8 @@ export class BrowserManager {
       this.sessions.delete(telegramId);
     }
 
+    this.displayManager.stopDisplay(telegramId);
+
     const userDataDir = this.getProfilePath(telegramId);
     await fs.promises.rm(userDataDir, { recursive: true, force: true });
 
@@ -379,5 +391,6 @@ export class BrowserManager {
       await managed.context.close().catch(() => {});
     }
     this.sessions.clear();
+    this.displayManager.stopAll();
   }
 }
