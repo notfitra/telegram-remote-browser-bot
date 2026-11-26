@@ -74,22 +74,15 @@ export class DisplayManager {
         detached: true,
       }
     );
+    xvfb.on('error', (err) => {
+      console.error(`[DisplayManager] Xvfb error (${config.displayStr}):`, err.message);
+    });
     xvfb.unref();
 
     // Beri jeda agar socket X11 siap
     await new Promise((r) => setTimeout(r, 600));
 
-    // 2. Jalankan window manager fluxbox jika terpasang
-    try {
-      const wm = spawn('fluxbox', [], {
-        env: { ...process.env, DISPLAY: config.displayStr },
-        stdio: 'ignore',
-        detached: true,
-      });
-      wm.unref();
-    } catch {}
-
-    // 3. Jalankan x11vnc independen khusus monitor virtual user ini
+    // 2. Jalankan x11vnc independen khusus monitor virtual user ini
     const vnc = spawn(
       'x11vnc',
       [
@@ -107,11 +100,14 @@ export class DisplayManager {
         detached: true,
       }
     );
+    vnc.on('error', (err) => {
+      console.error(`[DisplayManager] x11vnc error (${config.rfbPort}):`, err.message);
+    });
     vnc.unref();
 
     await new Promise((r) => setTimeout(r, 400));
 
-    // 4. Jalankan websockify noVNC independen pada port user ini
+    // 3. Jalankan websockify noVNC independen pada port user ini
     const ws = spawn(
       'websockify',
       [
@@ -124,6 +120,9 @@ export class DisplayManager {
         detached: true,
       }
     );
+    ws.on('error', (err) => {
+      console.error(`[DisplayManager] websockify error (${config.wsPort}):`, err.message);
+    });
     ws.unref();
 
     await new Promise((r) => setTimeout(r, 300));
