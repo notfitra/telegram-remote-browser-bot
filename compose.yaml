@@ -1,8 +1,6 @@
 services:
   app:
-    build:
-      context: .
-      dockerfile: Containerfile
+    image: docker.io/${DOCKERHUB_USERNAME:-fitra}/tg-remote-browser-bot:latest
     container_name: tg-remote-browser-bot
     restart: unless-stopped
     init: true

@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Remote Browser & Twitch Drops</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg: var(--tg-theme-bg-color, #0f1117);
+      --card: var(--tg-theme-secondary-bg-color, #181b24);
+      --text: var(--tg-theme-text-color, #f1f5f9);
+      --muted: var(--tg-theme-hint-color, #94a3b8);
+      --accent: var(--tg-theme-button-color, #9146ff);
+      --accent-text: var(--tg-theme-button-text-color, #ffffff);
+      --border: rgba(255, 255, 255, 0.08);
+      --ok: #22c55e;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 14px 14px 96px;
+      min-height: 100vh;
+    }
+
+    .view {
+      display: none;
+    }
+
+    .view.active {
+      display: block;
+    }
+
+    .header-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .header-title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--card);
+      border: 1px solid var(--border);
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+    }
+
+    .dot.watching {
+      background: var(--ok);
+      box-shadow: 0 0 8px var(--ok);
+    }
+
+    .dot.error {
+      background: var(--danger);
+    }
+
+    .bento-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    .bento-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .bento-card.span-2 {
+      grid-column: span 2;
+    }
+
+    .card-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .card-value {
+      font-size: 15px;
+      font-weight: 700;
+      word-break: break-word;
+    }
+
+    .card-sub {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    input[type="text"],
+    input[type="url"] {
+      flex: 1;
+      min-width: 0;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 14px;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: var(--accent);
+    }
+
+    .btn {
+      border: none;
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      background: var(--accent);
+      color: var(--accent-text);
+      transition: opacity 0.15s ease;
+    }
+
+    .btn:active {
+      opacity: 0.8;
+    }
+
+    .btn.secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+    }
+
+    .btn.danger {
+      background: rgba(239, 68, 68, 0.18);
+      color: #fca5a5;
+    }
+
+    .quick-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .quick-btn {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 12px;
+      padding: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .vnc-frame-wrap {
+      width: 100%;
+      height: calc(100vh - 175px);
+      min-height: 360px;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: #000;
+    }
+
+    .vnc-frame-wrap iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }
+
+    .vnc-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .vnc-actions .btn {
+      flex: 1;
+    }
+
+    .bookmark-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .bookmark-item {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .bookmark-meta {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .bookmark-title {
+      font-size: 14px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .bookmark-url {
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .bookmark-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .bottom-pill-nav {
+      position: fixed;
+      left: 50%;
+      bottom: 16px;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 6px;
+      padding: 6px;
+      border-radius: 999px;
+      background: rgba(24, 27, 36, 0.92);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--border);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+      z-index: 50;
+    }
+
+    .nav-pill {
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      padding: 9px 16px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .nav-pill.active {
+      background: var(--accent);
+      color: var(--accent-text);
+    }
+
+    .toast {
+      position: fixed;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1e293b;
+      color: #fff;
+      padding: 9px 14px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      z-index: 100;
+      display: none;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+    }
+  </style>
+</head>
+<body>
+  <div id="toast" class="toast"></div>
+
+  <!-- VIEW 1: DASHBOARD BENTO -->
+  <section id="view-dashboard" class="view active">
+    <div class="header-bar">
+      <div class="header-title">Remote Browser</div>
+      <div class="status-pill">
+        <span id="status-dot" class="dot"></span>
+        <span id="status-label">Memuat...</span>
+      </div>
+    </div>
+
+    <div class="bento-grid">
+      <div class="bento-card">
+        <div class="card-label">Channel / Situs</div>
+        <div id="active-target" class="card-value">-</div>
+      </div>
+
+      <div class="bento-card">
+        <div class="card-label">Heartbeat</div>
+        <div id="last-heartbeat" class="card-value">-</div>
+      </div>
+
+      <div class="bento-card">
+        <div class="card-label">RAM Server</div>
+        <div id="sys-ram" class="card-value">-</div>
+        <div id="sys-ram-sub" class="card-sub">-</div>
+      </div>
+
+      <div class="bento-card">
+        <div class="card-label">CPU Server</div>
+        <div id="sys-cpu" class="card-value">-</div>
+        <div id="sys-cpu-sub" class="card-sub">-</div>
+      </div>
+
+      <div class="bento-card span-2">
+        <div class="card-label">Twitch Drops Background Watch</div>
+        <div class="card-sub">
+          Masukkan nama channel Twitch. Browser server akan terus menonton walaupun Mini App ini Anda tutup.
+        </div>
+        <div class="input-row">
+          <input id="twitch-channel-input" type="text" placeholder="contoh: shroud atau twitch.tv/shroud" />
+          <button class="btn" onclick="watchTwitch()">Tonton</button>
+        </div>
+      </div>
+
+      <div class="bento-card span-2">
+        <div class="card-label">Buka Web Bebas (Non-Twitch)</div>
+        <div class="input-row">
+          <input id="custom-url-input" type="url" placeholder="https://kick.com atau URL lain" />
+          <button class="btn secondary" onclick="openCustomUrl()">Buka</button>
+        </div>
+        <label class="checkbox-row">
+          <input id="custom-bg-toggle" type="checkbox" checked />
+          <span>Tetap aktif di background (24/7 + auto-resume)</span>
+        </label>
+        <div class="quick-grid">
+          <button class="quick-btn" onclick="quickOpen('https://www.twitch.tv/login', true, false)">Twitch Login</button>
+          <button class="quick-btn" onclick="quickOpen('https://www.twitch.tv/drops/inventory', true, false)">Twitch Drops</button>
+          <button class="quick-btn" onclick="quickOpen('https://kick.com', true, true)">Kick.com</button>
+          <button class="quick-btn" onclick="quickOpen('https://www.youtube.com', true, true)">YouTube</button>
+        </div>
+      </div>
+
+      <div class="bento-card span-2">
+        <div class="card-label">Kontrol Sesi &amp; Privasi</div>
+        <div class="input-row">
+          <button class="btn secondary" style="flex:1" onclick="switchView('browser')">Layar Browser</button>
+          <button class="btn secondary" onclick="stopWatch()">Stop Tonton</button>
+        </div>
+        <button class="btn danger" style="width:100%" onclick="logoutSession()">Logout &amp; Hapus Data (Server + MongoDB)</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- VIEW 2: REMOTE BROWSER (noVNC) -->
+  <section id="view-browser" class="view">
+    <div class="header-bar">
+      <div class="header-title">Layar Browser Server</div>
+      <button class="btn secondary" onclick="reloadVnc()">Muat Ulang</button>
+    </div>
+
+    <div class="vnc-frame-wrap">
+      <iframe
+        id="vnc-iframe"
+        src="about:blank"
+        allow="clipboard-read; clipboard-write"
+      ></iframe>
+    </div>
+
+    <div class="vnc-actions">
+      <button class="btn" onclick="closeMiniAppKeepRunning()">Tutup Mini App &amp; Tetap Tonton</button>
+    </div>
+  </section>
+
+  <!-- VIEW 3: SAVED SESSIONS -->
+  <section id="view-sessions" class="view">
+    <div class="header-bar">
+      <div class="header-title">Riwayat &amp; Bookmark</div>
+      <button class="btn secondary" onclick="fetchStatus()">Refresh</button>
+    </div>
+    <div id="bookmark-list" class="bookmark-list"></div>
+  </section>
+
+  <!-- FLOATING PILL BOTTOM NAVIGATION -->
+  <nav class="bottom-pill-nav">
+    <button class="nav-pill active" data-view="dashboard" onclick="switchView('dashboard')">Dashboard</button>
+    <button class="nav-pill" data-view="browser" onclick="switchView('browser')">Browser</button>
+    <button class="nav-pill" data-view="sessions" onclick="switchView('sessions')">Sesi</button>
+  </nav>
+
+  <script>
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+    }
+
+    let vncLoaded = false;
+
+    function showToast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 3000);
+    }
+
+    async function api(path, options = {}) {
+      const headers = {
+        'Content-Type': 'application/json',
+        'x-telegram-init-data': tg?.initData || '',
+        ...(options.headers || {}),
+      };
+      const res = await fetch(path, { ...options, headers });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Permintaan gagal');
+      return data;
+    }
+
+    function switchView(name) {
+      document.querySelectorAll('.view').forEach((v) => v.classList.remove('active'));
+      document.getElementById(`view-${name}`).classList.add('active');
+
+      document.querySelectorAll('.nav-pill').forEach((p) => {
+        p.classList.toggle('active', p.dataset.view === name);
+      });
+
+      if (name === 'browser' && !vncLoaded) {
+        reloadVnc();
+      }
+    }
+
+    function reloadVnc() {
+      const iframe = document.getElementById('vnc-iframe');
+      iframe.src = '/novnc/vnc.html?autoconnect=1&resize=scale&path=novnc/websockify';
+      vncLoaded = true;
+    }
+
+    async function fetchStatus() {
+      try {
+        const data = await api('/api/status');
+        const live = data.live;
+        const dot = document.getElementById('status-dot');
+        const label = document.getElementById('status-label');
+
+        dot.className = 'dot ' + (live.status === 'watching' ? 'watching' : live.status === 'error' ? 'error' : '');
+        label.textContent = live.status === 'watching' ? 'Menonton 24/7' : live.running ? 'Standby' : 'Idle';
+
+        document.getElementById('active-target').textContent =
+          live.channelName ? `twitch.tv/${live.channelName}` : (live.currentUrl || '-');
+
+        const hb = data.dbSession?.lastHeartbeatAt
+          ? new Date(data.dbSession.lastHeartbeatAt).toLocaleTimeString('id-ID')
+          : '-';
+        document.getElementById('last-heartbeat').textContent = hb;
+
+        if (data.system) {
+          document.getElementById('sys-ram').textContent = `${data.system.memUsagePercent}%`;
+          document.getElementById('sys-ram-sub').textContent =
+            `${data.system.memUsedMB} / ${data.system.memTotalMB} MB`;
+          document.getElementById('sys-cpu').textContent = `${data.system.cpuUsagePercent}%`;
+          document.getElementById('sys-cpu-sub').textContent =
+            `${data.system.cpuCores} core • ${data.system.activeBrowserSessions} sesi`;
+        }
+
+        renderBookmarks(data.bookmarks || []);
+      } catch (err) {
+        showToast(err.message);
+      }
+    }
+
+    function renderBookmarks(items) {
+      const container = document.getElementById('bookmark-list');
+      if (items.length === 0) {
+        container.innerHTML = '<div class="bento-card"><div class="card-sub">Belum ada riwayat channel atau situs tersimpan.</div></div>';
+        return;
+      }
+
+      container.innerHTML = items.map((item) => `
+        <div class="bookmark-item">
+          <div class="bookmark-meta">
+            <div class="bookmark-title">${escapeHtml(item.label)}</div>
+            <div class="bookmark-url">${escapeHtml(item.url)}</div>
+          </div>
+          <div class="bookmark-actions">
+            <button class="btn" onclick="quickOpen('${escapeAttr(item.url)}', false, true)">Tonton</button>
+            <button class="btn danger" onclick="removeBookmark('${escapeAttr(item.url)}')">Hapus</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function watchTwitch() {
+      const input = document.getElementById('twitch-channel-input');
+      const channel = input.value.trim();
+      if (!channel) return showToast('Masukkan nama channel Twitch');
+
+      try {
+        await api('/api/twitch/watch', {
+          method: 'POST',
+          body: JSON.stringify({ channel }),
+        });
+        input.value = '';
+        showToast('Channel dibuka di background');
+        await fetchStatus();
+      } catch (err) {
+        showToast(err.message);
+      }
+    }
+
+    async function openCustomUrl() {
+      const input = document.getElementById('custom-url-input');
+      const url = input.value.trim();
+      const keepBg = document.getElementById('custom-bg-toggle').checked;
+      if (!url) return showToast('Masukkan URL tujuan');
+      await quickOpen(url, true, keepBg);
+    }
+
+    async function quickOpen(url, openViewer = false, watchInBackground = false) {
+      try {
+        await api('/api/navigate', {
+          method: 'POST',
+          body: JSON.stringify({ url, watchInBackground }),
+        });
+        showToast('Halaman dibuka di browser server');
+        await fetchStatus();
+        if (openViewer) switchView('browser');
+      } catch (err) {
+        showToast(err.message);
+      }
+    }
+
+    async function stopWatch() {
+      try {
+        await api('/api/stop', { method: 'POST' });
+        showToast('Sesi tonton dihentikan');
+        await fetchStatus();
+      } catch (err) {
+        showToast(err.message);
+      }
+    }
+
+    async function logoutSession() {
+      const confirmed = window.confirm(
+        'Logout akan menutup browser, menghapus semua cookie/login di server, serta menghapus sesi & bookmark Anda di MongoDB. Lanjutkan?'
+      );
+      if (!confirmed) return;
+
+      try {
+        await api('/api/logout', {
+          method: 'POST',
+          body: JSON.stringify({ includeBookmarks: true }),
+        });
+        document.getElementById('vnc-iframe').src = 'about:blank';
+        vncLoaded = false;
+        showToast('Logout berhasil & data dihapus');
+        await fetchStatus();
+      } catch (err) {
+        showToast(err.message);
+      }
+    }
+
+    async function removeBookmark(url) {
+      try {
+        await api('/api/bookmarks', {
+          method: 'DELETE',
+          body: JSON.stringify({ url }),
+        });
+        await fetchStatus();
+      } catch (err) {
+        showToast(err.message);
+      }
+    }
+
+    function closeMiniAppKeepRunning() {
+      if (tg) {
+        tg.close();
+      } else {
+        showToast('Browser server tetap berjalan di background');
+      }
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function escapeAttr(str) {
+      return String(str).replace(/'/g, "\\'");
+    }
+
+    fetchStatus();
+    setInterval(fetchStatus, 15000);
+  </script>
+</body>
+</html>
