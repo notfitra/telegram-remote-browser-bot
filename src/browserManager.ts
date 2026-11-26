@@ -23,15 +23,43 @@ export class BrowserManager {
   private sessions = new Map<number, ManagedSession>();
   private profilesDir: string;
   private displayManager: DisplayManager;
+  private cleanInterval?: NodeJS.Timeout;
 
   constructor(profilesDir: string, displayManager: DisplayManager) {
     this.profilesDir = profilesDir;
     this.displayManager = displayManager;
     fs.mkdirSync(this.profilesDir, { recursive: true });
+
+    // Bersihkan sampah cache browser saat startup dan rutin tiap 12 jam
+    this.cleanBrowserCaches().catch(() => {});
+    this.cleanInterval = setInterval(() => {
+      this.cleanBrowserCaches().catch(() => {});
+    }, 12 * 3600 * 1000);
   }
 
   getActiveSessionCount(): number {
     return this.sessions.size;
+  }
+
+  /**
+   * Membersihkan sampah cache Chrome (video chunks, shaders, media cache)
+   * secara aman tanpa menghapus Cookies atau Local Storage (user tetap login).
+   */
+  async cleanBrowserCaches(): Promise<void> {
+    try {
+      const entries = await fs.promises.readdir(this.profilesDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        const defaultDir = path.join(this.profilesDir, entry.name, 'Default');
+        const trashFolders = ['Cache', 'Code Cache', 'GPUCache', 'DawnCache', 'Media Cache'];
+        for (const folder of trashFolders) {
+          const target = path.join(defaultDir, folder);
+          try {
+            await fs.promises.rm(target, { recursive: true, force: true });
+          } catch {}
+        }
+      }
+    } catch {}
   }
 
   private getProfilePath(telegramId: number): string {
@@ -71,6 +99,8 @@ export class BrowserManager {
         '--mute-audio',
         '--window-position=0,0',
         '--window-size=1280,720',
+        '--disk-cache-size=104857600',
+        '--media-cache-size=52428800',
       ],
     });
 
@@ -486,6 +516,10 @@ export class BrowserManager {
   }
 
   async closeAll(): Promise<void> {
+    if (this.cleanInterval) {
+      clearInterval(this.cleanInterval);
+      this.cleanInterval = undefined;
+    }
     for (const managed of this.sessions.values()) {
       this.stopHeartbeat(managed);
       await managed.context.close().catch(() => {});
