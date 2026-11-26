@@ -22,6 +22,10 @@ podman-compose pull
 echo "▶️  Menjalankan container..."
 podman-compose up -d
 
+# 3. Bersihkan sisa image versi lama (dangling) yang tertimpa oleh pull baru
+echo "🧹 Membersihkan sisa image lama yang tertimpa..."
+podman image prune -f
+
 echo ""
 echo "=========================================="
 echo "✅ Bot & Database berhasil dinyalakan!"
