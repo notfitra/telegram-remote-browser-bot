@@ -1,6 +1,6 @@
 services:
   app:
-    image: docker.io/${DOCKERHUB_USERNAME:-fitra}/tg-remote-browser-bot:latest
+    image: docker.io/${DOCKERHUB_USERNAME:-fitra17}/tg-remote-browser-bot:latest
     container_name: tg-remote-browser-bot
     restart: unless-stopped
     init: true
