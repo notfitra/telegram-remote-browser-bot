@@ -1,0 +1,29 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Containerfile
+    container_name: tg-remote-browser-bot
+    restart: unless-stopped
+    init: true
+    shm_size: '1gb'
+    env_file:
+      - .env
+    ports:
+      - "${PORT}:${PORT}"
+    volumes:
+      - browser_profiles:/data/profiles
+    depends_on:
+      - mongo
+
+  # Hapus atau komentari service 'mongo' di bawah ini jika menggunakan MongoDB Cloud Atlas
+  mongo:
+    image: docker.io/library/mongo:7
+    container_name: tg-remote-browser-mongo
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+
+volumes:
+  browser_profiles:
+  mongo_data:
