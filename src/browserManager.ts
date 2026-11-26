@@ -45,6 +45,7 @@ export class BrowserManager {
     fs.mkdirSync(userDataDir, { recursive: true });
 
     const context = await chromium.launchPersistentContext(userDataDir, {
+      channel: 'chrome',
       headless: false,
       viewport: { width: 1280, height: 720 },
       ignoreDefaultArgs: ['--enable-automation'],
@@ -60,7 +61,6 @@ export class BrowserManager {
         '--mute-audio',
         '--window-position=0,0',
         '--window-size=1280,720',
-        '--test-type',
       ],
     });
 

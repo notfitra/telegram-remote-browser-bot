@@ -17,6 +17,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install && npm cache clean --force
 
+# Install Google Chrome resmi lengkap dengan codec H.264 & AAC agar stream Twitch berjalan tanpa Error #4000
+RUN PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=0 npx playwright install --with-deps chrome
+
 COPY tsconfig.json ./
 COPY src/ ./src/
 COPY public/ ./public/
