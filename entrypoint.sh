@@ -7,8 +7,10 @@ rm -f /tmp/.X99-lock
 Xvfb :99 -screen 0 1280x720x24 -ac +extension GLX +render -noreset &
 sleep 1
 
-# 2. Jalankan window manager jika tersedia
-which fluxbox >/dev/null 2>&1 && fluxbox & || true
+# 2. Jalankan window manager jika terinstall
+if command -v fluxbox >/dev/null 2>&1; then
+  fluxbox &
+fi
 
 # 3. Jalankan x11vnc pada display :99
 x11vnc -display :99 -forever -shared -nopw -rfbport 5900 -quiet &
